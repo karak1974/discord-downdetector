@@ -1,4 +1,4 @@
-name: downdetector
+name: discord-downdetector
 
 on:
   push:
@@ -6,27 +6,19 @@ on:
       - main
 
 env:
-  # This needs to be unique across all of netlify.app
-  APP_NAME: todoapp-dagger-europa
-  #NETLIFY_TEAM: dagger
+  APP_NAME: discord-downdetector
 
 jobs:
   dagger:
     runs-on: ubuntu-latest
     steps:
       - name: Clone repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
-      # You need to run `dagger project init` locally before and commit the cue.mod directory to the repository with its contents
       - name: Deploy
         uses: dagger/dagger-for-github@v3
-        # See all options at https://github.com/dagger/dagger-for-github
         with:
           version: 0.2
-          # To pin external dependencies, you can use `project update github.com/[package-source]@v[n]`
           cmds: |
             project update
             do deploy
-        #env:
-          # Get one from https://app.netlify.com/user/applications/personal
-          #NETLIFY_TOKEN: ${{ secrets.NETLIFY_TOKEN }}

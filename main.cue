@@ -16,6 +16,9 @@ dagger.#Plan & {
         network: "unix:///var/run/docker.sock": connect: {
             dagger.#Socket
         }
+        env: SECRET: {
+            dagger.#Secret
+        }
     }
 
     actions: {
@@ -50,9 +53,19 @@ dagger.#Plan & {
             ]
         }
 
-        push: docker.#Push & {
-            image: run.output
-            dest:  "discord-downdetector/dagger"
+        // Push image to remote registry (depends on image)
+        push: {
+            // Docker username
+            _dockerUsername: "wolfy42"
+
+            docker.#Push & {
+                "image": run.output
+                dest:    "\(_dockerUsername)/discord-downdetector"
+                auth: {
+                    username: _dockerUsername
+                    secret:   client.env.SECRET
+                }
+            }
         }
 
         load: cli.#Load & {

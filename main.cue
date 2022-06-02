@@ -9,6 +9,7 @@ import (
 )
 
 dagger.#Plan & {
+    // Declare client for multiple usecases
     client: {
         filesystem: "./": read: {
             contents: dagger.#FS
@@ -42,20 +43,24 @@ dagger.#Plan & {
                         name: "update-ca-certificates"
                     }
                 },
-                // COPY
+                // Copy from build to run
                 docker.#Copy & {
                     contents: build.output
                     dest:     "/app"
                 },
+                docker.#Copy & {
+                    contents: client.filesystem."./".read.contents
+                    include: ["config.json"]
+                    dest: "/"
+                },
                 docker.#Set & {
-                    config: cmd: ["./main"]
+                    config: cmd: ["./app/discord-downdetector"]
                 },
             ]
         }
 
-        // Push image to remote registry (depends on image)
+        // Push image to remote registry
         push: {
-            // Docker username
             _dockerUsername: "wolfy42"
 
             docker.#Push & {
@@ -68,6 +73,7 @@ dagger.#Plan & {
             }
         }
 
+        // Create a docker image localy
         load: cli.#Load & {
             image: run.output
             host:  client.network."unix:///var/run/docker.sock".connect

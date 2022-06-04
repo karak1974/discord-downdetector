@@ -21,4 +21,4 @@ jobs:
           version: 0.2
           cmds: |
             project update
-            do deploy
+            do load

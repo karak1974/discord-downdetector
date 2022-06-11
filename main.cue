@@ -63,7 +63,7 @@ dagger.#Plan & {
                     dest: "/"
                 },
                 docker.#Set & {
-                    config: cmd: ["./app/\#(client.env.APP_NAME)"]
+                    config: cmd: ["./app/\(client.env.APP_NAME)"]
                 },
             ]
         }
@@ -74,7 +74,7 @@ dagger.#Plan & {
 
             docker.#Push & {
                 "image": run.output
-                dest:    "\(_dockerUsername)/\#(client.env.APP_NAME)"
+                dest:    "\(_dockerUsername)/\(client.env.APP_NAME)"
                 auth: {
                     username: _dockerUsername
                     secret:   client.env.SECRET

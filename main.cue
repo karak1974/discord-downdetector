@@ -7,7 +7,11 @@ import (
     "universe.dagger.io/docker/cli"
     "universe.dagger.io/go"
 )
-
+// TODO
+// use github secrets for user, pass, host
+// install cosign
+// universal usecase
+// branch, repository, image
 dagger.#Plan & {
     // Declare client for multiple usecases
     client: {
@@ -17,8 +21,11 @@ dagger.#Plan & {
         network: "unix:///var/run/docker.sock": connect: {
             dagger.#Socket
         }
-        env: SECRET: {
-            dagger.#Secret
+        env: {
+            APP_NAME:                     string
+            SECRET:                       dagger.#Secret
+            //GITHUB_SHA:                   string
+            //SSH_PRIVATE_KEY_DOCKER_SWARM: dagger.#Secret
         }
     }
 
@@ -36,6 +43,8 @@ dagger.#Plan & {
                         "gcc": _
                         "libc-dev": _
                         "ca-certificates": _
+                        "git": _
+                        "go": _
                     }
                 },
                 docker.#Run & {
@@ -54,7 +63,7 @@ dagger.#Plan & {
                     dest: "/"
                 },
                 docker.#Set & {
-                    config: cmd: ["./app/discord-downdetector"]
+                    config: cmd: ["./app/\#(client.env.APP_NAME)"]
                 },
             ]
         }
@@ -65,7 +74,7 @@ dagger.#Plan & {
 
             docker.#Push & {
                 "image": run.output
-                dest:    "\(_dockerUsername)/discord-downdetector"
+                dest:    "\(_dockerUsername)/\#(client.env.APP_NAME)"
                 auth: {
                     username: _dockerUsername
                     secret:   client.env.SECRET
@@ -77,7 +86,7 @@ dagger.#Plan & {
         load: cli.#Load & {
             image: run.output
             host:  client.network."unix:///var/run/docker.sock".connect
-            tag:   "discord-downdetector"
+            tag:   client.env.APP_NAME
         }
     }
 }

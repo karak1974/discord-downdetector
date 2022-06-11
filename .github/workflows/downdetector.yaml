@@ -8,7 +8,7 @@ on:
 env:
   DOCKER_USER:   ${{ secrets.DOCKER_USER }}
   DOCKER_SECRET: ${{ secrets.DOCKER_SECRET }}
-  REPOSITORY:    ${{ GITHUB_REPOSITORY }}
+  REPOSITORY:    ${{ github.event.repository.name }}
 
 jobs:
   dagger:

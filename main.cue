@@ -22,10 +22,9 @@ dagger.#Plan & {
             dagger.#Socket
         }
         env: {
-            APP_NAME:                     string
-            SECRET:                       dagger.#Secret
-            //GITHUB_SHA:                   string
-            //SSH_PRIVATE_KEY_DOCKER_SWARM: dagger.#Secret
+            REPOSITORY:    string
+            DOCKER_USER:   string
+            DOCKER_SECRET: dagger.#Secret
         }
     }
 
@@ -63,21 +62,20 @@ dagger.#Plan & {
                     dest: "/"
                 },
                 docker.#Set & {
-                    config: cmd: ["./app/\(client.env.APP_NAME)"]
+                    config: cmd: ["./app/\(client.env.REPOSITORY)"]
                 },
             ]
         }
 
         // Push image to remote registry
         push: {
-            _dockerUsername: "wolfy42"
 
             docker.#Push & {
                 "image": run.output
-                dest:    "\(_dockerUsername)/\(client.env.APP_NAME)"
+                dest:    "\(client.env.DOCKER_USER)/\(client.env.REPOSITORY)"
                 auth: {
-                    username: _dockerUsername
-                    secret:   client.env.SECRET
+                    username: client.env.DOCKER_USER
+                    secret:   client.env.DOCKER_SECRET
                 }
             }
         }
@@ -86,7 +84,7 @@ dagger.#Plan & {
         load: cli.#Load & {
             image: run.output
             host:  client.network."unix:///var/run/docker.sock".connect
-            tag:   client.env.APP_NAME
+            tag:   client.env.REPOSITORY
         }
     }
 }

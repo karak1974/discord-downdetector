@@ -6,8 +6,9 @@ on:
       - main
 
 env:
-  APP_NAME: discord-downdetector
-  SECRET: ${{ secrets.SECRET }}
+  DOCKER_USER:   ${{ secrets.DOCKER_USER }}
+  DOCKER_SECRET: ${{ secrets.DOCKER_SECRET }}
+  REPOSITORY:    ${{ GITHUB_REPOSITORY }}
 
 jobs:
   dagger:

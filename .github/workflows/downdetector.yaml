@@ -7,6 +7,7 @@ on:
 
 env:
   APP_NAME: discord-downdetector
+  SECRET: ${{ secrets.SECRET }}
 
 jobs:
   dagger:

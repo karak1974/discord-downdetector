@@ -10,9 +10,9 @@ on:
       - "*"
 
 env:
-  DOCKER_USER:     ${{ secrets.DOCKER_USER }}
-  DOCKER_SECRET:   ${{ secrets.DOCKER_SECRET }}
-  REPOSITORY_NAME: ${{ github.event.repository.name }}
+  REPOSITORY:    ${{ github.event.repository.name }}
+  DOCKER_USER:   ${{ secrets.DOCKER_USER }}
+  DOCKER_SECRET: ${{ secrets.DOCKER_SECRET }}
 
 jobs:
   dagger:

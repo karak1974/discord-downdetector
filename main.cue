@@ -1,8 +1,6 @@
 package main
 
 import (
-    "tool/exec"
-    
     "dagger.io/dagger"
     
     "universe.dagger.io/alpine"
@@ -18,6 +16,16 @@ import (
 dagger.#Plan & {
     // Declare client for multiple usecases
     client: {
+        commands: {
+            version_pre: {
+                name: "echo \"${{ github.ref }}\" | sed -e \\'s,.*/\\(.*\\),\\1,\\'"
+                //stdout: string
+            }
+            version: {
+                name: "[[ \"${{ github.ref }}\" == \"refs/tags/\"* ]] && echo \(version_pre.stdout) | sed -e 's/^v//'"
+                //stdout: string
+            }
+        },
         filesystem: "./": read: {
             contents: dagger.#FS
         }
@@ -25,22 +33,13 @@ dagger.#Plan & {
             dagger.#Socket
         }
         env: {
-            REPOSITORY_NAME: string
-            DOCKER_USER:     string
-            DOCKER_SECRET:   dagger.#Secret
+            REPOSITORY:    string
+            DOCKER_USER:   string
+            DOCKER_SECRET: dagger.#Secret
         }
     }
 
     actions: {
-        version_pre: exec.#Run & {
-		    cmd: ["echo", "\"${{ github.ref }}\"", "|", "sed -e 's,.*/\(.*\),\1,'"]
-		    stdout: string
-	    }
-        version: exec.#Run & {
-		    cmd: ["[[ \"${{ github.ref }}\" == \"refs/tags/\"* ]] && echo \(version_pre.stdout) | sed -e 's/^v//'"]
-		    stdout: string
-	    }
-        
         // Build app in a Golang container
         build: go.#Build & {
             source: client.filesystem."./".read.contents
@@ -74,17 +73,18 @@ dagger.#Plan & {
                     dest: "/"
                 },
                 docker.#Set & {
-                    config: cmd: ["./app/\(client.env.REPOSITORY_NAME)"]
+                    config: cmd: ["./app/\(client.env.REPOSITORY)"]
                 },
             ]
         }
 
         // Push image to remote registry
         push: {
+            version: client.commands.version.stdout
 
             docker.#Push & {
                 "image": run.output
-                dest:    "\(client.env.DOCKER_USER)/\(client.env.REPOSITORY_NAME)_\(version.stdout)"
+                dest:    "\(client.env.DOCKER_USER)/\(client.env.REPOSITORY)_\(version)"
                 auth: {
                     username: client.env.DOCKER_USER
                     secret:   client.env.DOCKER_SECRET
@@ -96,7 +96,7 @@ dagger.#Plan & {
         load: cli.#Load & {
             image: run.output
             host:  client.network."unix:///var/run/docker.sock".connect
-            tag:   client.env.REPOSITORY_NAME
+            tag:   client.env.REPOSITORY
         }
     }
 }

@@ -1,17 +1,20 @@
 package main
 
 import (
+    "tool/exec"
+    
     "dagger.io/dagger"
+    
     "universe.dagger.io/alpine"
     "universe.dagger.io/docker"
     "universe.dagger.io/docker/cli"
     "universe.dagger.io/go"
 )
 // TODO
-// use github secrets for user, pass, host
 // install cosign
-// universal usecase
-// branch, repository, image
+// First with one branch
+// Later add multiple branches as multiple tags
+
 dagger.#Plan & {
     // Declare client for multiple usecases
     client: {
@@ -22,13 +25,22 @@ dagger.#Plan & {
             dagger.#Socket
         }
         env: {
-            REPOSITORY:    string
-            DOCKER_USER:   string
-            DOCKER_SECRET: dagger.#Secret
+            REPOSITORY_NAME: string
+            DOCKER_USER:     string
+            DOCKER_SECRET:   dagger.#Secret
         }
     }
 
     actions: {
+        version_pre: exec.#Run & {
+		    cmd: ["echo", "\"${{ github.ref }}\"", "|", "sed -e 's,.*/\(.*\),\1,'"]
+		    stdout: string
+	    }
+        version: exec.#Run & {
+		    cmd: ["[[ \"${{ github.ref }}\" == \"refs/tags/\"* ]] && echo \(version_pre.stdout) | sed -e 's/^v//'"]
+		    stdout: string
+	    }
+        
         // Build app in a Golang container
         build: go.#Build & {
             source: client.filesystem."./".read.contents
@@ -62,7 +74,7 @@ dagger.#Plan & {
                     dest: "/"
                 },
                 docker.#Set & {
-                    config: cmd: ["./app/\(client.env.REPOSITORY)"]
+                    config: cmd: ["./app/\(client.env.REPOSITORY_NAME)"]
                 },
             ]
         }
@@ -72,7 +84,7 @@ dagger.#Plan & {
 
             docker.#Push & {
                 "image": run.output
-                dest:    "\(client.env.DOCKER_USER)/\(client.env.REPOSITORY)"
+                dest:    "\(client.env.DOCKER_USER)/\(client.env.REPOSITORY_NAME)_\(version.stdout)"
                 auth: {
                     username: client.env.DOCKER_USER
                     secret:   client.env.DOCKER_SECRET
@@ -84,7 +96,7 @@ dagger.#Plan & {
         load: cli.#Load & {
             image: run.output
             host:  client.network."unix:///var/run/docker.sock".connect
-            tag:   client.env.REPOSITORY
+            tag:   client.env.REPOSITORY_NAME
         }
     }
 }

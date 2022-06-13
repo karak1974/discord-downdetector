@@ -3,15 +3,20 @@ name: discord-downdetector
 on:
   push:
     branches:
-      - main
+      #- main
+      - "*"
+    tags:
+      #- v*
+      - "*"
 
 env:
-  DOCKER_USER:   ${{ secrets.DOCKER_USER }}
-  DOCKER_SECRET: ${{ secrets.DOCKER_SECRET }}
-  REPOSITORY:    ${{ github.event.repository.name }}
+  DOCKER_USER:     ${{ secrets.DOCKER_USER }}
+  DOCKER_SECRET:   ${{ secrets.DOCKER_SECRET }}
+  REPOSITORY_NAME: ${{ github.event.repository.name }}
 
 jobs:
   dagger:
+    name: Build the image with Dagger
     runs-on: ubuntu-latest
     steps:
       - name: Clone repository
@@ -23,4 +28,4 @@ jobs:
           version: 0.2
           cmds: |
             project update
-            do load
+            do push

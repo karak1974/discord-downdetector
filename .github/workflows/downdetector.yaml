@@ -11,6 +11,7 @@ on:
 
 env:
   REPOSITORY:    ${{ github.event.repository.name }}
+  GITHUB_REF:    ${{ github.ref }}
   DOCKER_USER:   ${{ secrets.DOCKER_USER }}
   DOCKER_SECRET: ${{ secrets.DOCKER_SECRET }}
 

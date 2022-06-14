@@ -2,6 +2,7 @@ package main
 
 import (
     "dagger.io/dagger"
+    "dagger.io/dagger/core"
     
     "universe.dagger.io/alpine"
     "universe.dagger.io/docker"
@@ -10,22 +11,10 @@ import (
 )
 // TODO
 // install cosign
-// First with one branch
-// Later add multiple branches as multiple tags
 
 dagger.#Plan & {
     // Declare client for multiple usecases
     client: {
-        commands: {
-            version_pre: {
-                name: "echo \"${{ github.ref }}\" | sed -e \\'s,.*/\\(.*\\),\\1,\\'"
-                //stdout: string
-            }
-            version: {
-                name: "[[ \"${{ github.ref }}\" == \"refs/tags/\"* ]] && echo \(version_pre.stdout) | sed -e 's/^v//'"
-                //stdout: string
-            }
-        },
         filesystem: "./": read: {
             contents: dagger.#FS
         }
@@ -34,12 +23,28 @@ dagger.#Plan & {
         }
         env: {
             REPOSITORY:    string
+            GITHUB_REF:    string
             DOCKER_USER:   string
             DOCKER_SECRET: dagger.#Secret
+        }
+       commands: {
+            version: {
+                name: "bash"
+                args: ["-c", #"""
+					if [[ \#(client.env.GITHUB_REF) =~ "refs/tags/" ]]; then echo \#(client.env.GITHUB_REF) | sed -e 's/^refs\/tags\/v//' | tr -d "[:space:]"
+					elif [[ \#(client.env.GITHUB_REF) =~ "refs/heads/" ]]; then echo \#(client.env.GITHUB_REF) | sed -e 's/^refs\/heads\///' | tr -d "[:space:]"
+					fi
+					"""#]
+                stdout: string
+            }
         }
     }
 
     actions: {
+        test: core.#Nop & {
+            input: client.commands.version.stdout
+        }
+
         // Build app in a Golang container
         build: go.#Build & {
             source: client.filesystem."./".read.contents
@@ -80,11 +85,10 @@ dagger.#Plan & {
 
         // Push image to remote registry
         push: {
-            version: client.commands.version.stdout
 
             docker.#Push & {
                 "image": run.output
-                dest:    "\(client.env.DOCKER_USER)/\(client.env.REPOSITORY)_\(version)"
+                dest:    "\(client.env.DOCKER_USER)/\(client.env.REPOSITORY):\(client.commands.version.stdout)"
                 auth: {
                     username: client.env.DOCKER_USER
                     secret:   client.env.DOCKER_SECRET
@@ -95,8 +99,8 @@ dagger.#Plan & {
         // Create a docker image localy
         load: cli.#Load & {
             image: run.output
-            host:  client.network."unix:///var/run/docker.sock".connect
             tag:   client.env.REPOSITORY
+            host:  client.network."unix:///var/run/docker.sock".connect
         }
     }
 }

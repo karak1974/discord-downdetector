@@ -41,10 +41,6 @@ dagger.#Plan & {
     }
 
     actions: {
-        test: core.#Nop & {
-            input: client.commands.version.stdout
-        }
-
         // Build app in a Golang container
         build: go.#Build & {
             source: client.filesystem."./".read.contents

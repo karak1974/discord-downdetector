@@ -10,10 +10,11 @@ on:
       - "*"
 
 env:
-  REPOSITORY:    ${{ github.event.repository.name }}
-  GITHUB_REF:    ${{ github.ref }}
-  DOCKER_USER:   ${{ secrets.DOCKER_USER }}
-  DOCKER_SECRET: ${{ secrets.DOCKER_SECRET }}
+  REPOSITORY:         ${{ github.event.repository.name }}
+  GITHUB_REF:         ${{ github.ref }}
+  COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+  DOCKER_USER:        ${{ secrets.DOCKER_USER }}
+  DOCKER_SECRET:      ${{ secrets.DOCKER_SECRET }}
 
 jobs:
   dagger:

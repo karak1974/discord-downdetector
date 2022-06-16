@@ -21,10 +21,11 @@ dagger.#Plan & {
             dagger.#Socket
         }
         env: {
-            REPOSITORY:    string
-            GITHUB_REF:    string
-            DOCKER_USER:   string
-            DOCKER_SECRET: dagger.#Secret
+            REPOSITORY:         string
+            GITHUB_REF:         string
+            COSIGN_PRIVATE_KEY: dagger.#Secret
+            DOCKER_USER:        string
+            DOCKER_SECRET:      dagger.#Secret
         }
        commands: {
             version: {
@@ -45,6 +46,25 @@ dagger.#Plan & {
             source: client.filesystem."./".read.contents
         }
 
+        // Ugly way to copy the secret
+		_cosign: alpine.#Build & {
+			packages: {
+				"bash": _
+			}
+		}
+		_secret: docker.#Run & {
+			input: _cosign.output
+			mounts: secret: {
+				dest:     "/run/cosign.key"
+				contents: client.env.COSIGN_PRIVATE_KEY
+			}
+			command: {
+				name: "cp"
+				args: ["/run/cosign.key", "/cosign.key"]
+			}
+			export: directories: "/cosign.key": _
+		}
+
         // Build lighter image
         run: docker.#Build & {
             steps: [
@@ -53,8 +73,6 @@ dagger.#Plan & {
                         "gcc": _
                         "libc-dev": _
                         "ca-certificates": _
-                        "git": _
-                        "go": _
                     }
                 },
                 docker.#Run & {
@@ -62,6 +80,11 @@ dagger.#Plan & {
                         name: "update-ca-certificates"
                     }
                 },
+                // Put the private key into /cosign.key
+                docker.#Copy & {
+					contents: _secret.export.directories."/cosign.key"
+					dest:     "/"
+				},
                 // Copy from build to run
                 docker.#Copy & {
                     contents: build.output

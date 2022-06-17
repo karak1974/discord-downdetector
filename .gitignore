@@ -17,3 +17,5 @@ vendor/
 config.json
 .idea
 cue.mod
+cosign.key
+cosign.pub

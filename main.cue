@@ -8,8 +8,6 @@ import (
     "universe.dagger.io/docker/cli"
     "universe.dagger.io/go"
 )
-// TODO
-// install cosign
 
 dagger.#Plan & {
     // Declare client for multiple usecases
@@ -23,7 +21,10 @@ dagger.#Plan & {
         env: {
             REPOSITORY:         string
             GITHUB_REF:         string
+            GITHUB_ACTOR:       string
             COSIGN_PRIVATE_KEY: dagger.#Secret
+            COSIGN_PASSWORD:    dagger.#Secret
+            DOCKER_REPO:        string
             DOCKER_USER:        string
             DOCKER_SECRET:      dagger.#Secret
         }
@@ -46,7 +47,7 @@ dagger.#Plan & {
             source: client.filesystem."./".read.contents
         }
 
-        // Ugly way to copy the secret
+        // Ugly way to copy the secret and set the password env
 		_cosign: alpine.#Build & {
 			packages: {
 				"bash": _
@@ -62,7 +63,23 @@ dagger.#Plan & {
 				name: "cp"
 				args: ["/run/cosign.key", "/cosign.key"]
 			}
-			export: directories: "/cosign.key": _
+			export: directories: {
+                "/cosign.key": _
+            }
+		}
+        _password: docker.#Run & {
+			input: _cosign.output
+			mounts: secret: {
+				dest:     "/run/cosign.passwd"
+				contents: client.env.COSIGN_PASSWORD
+			}
+			command: {
+				name: "cp"
+				args: ["/run/cosign.passwd", "/cosign.passwd"]
+			}
+			export: directories: {
+                "/cosign.passwd": _
+            }
 		}
 
         // Build lighter image
@@ -75,6 +92,7 @@ dagger.#Plan & {
                         "ca-certificates": _
                     }
                 },
+                // Update certificates
                 docker.#Run & {
                     command: {
                         name: "update-ca-certificates"
@@ -85,16 +103,41 @@ dagger.#Plan & {
 					contents: _secret.export.directories."/cosign.key"
 					dest:     "/"
 				},
+                docker.#Copy & {
+					contents: _password.export.directories."/cosign.passwd"
+					dest:     "/"
+				},
                 // Copy from build to run
                 docker.#Copy & {
                     contents: build.output
                     dest:     "/app"
                 },
+                // Sign with cosign
+                docker.#Run & {
+                    env: IMAGE_ID:        "\(client.env.DOCKER_REPO)/\(client.env.DOCKER_USER)/\(client.env.REPOSITORY)"
+                    env: VERSION:         client.commands.version.stdout
+                    env: REPOSITORY:      client.env.REPOSITORY
+                    env: DEVELOPER:       client.env.GITHUB_ACTOR
+                    env: COSIGN_PASSWORD: client.env.COSIGN_PASSWORD
+                    command: {
+                        name: "sh"
+                        args: ["-c", #"""
+                            echo Setting up Cosign
+                            export COSIGN_PASSWORD=$(cat /cosign.passwd)
+                            wget -q https://github.com/sigstore/cosign/releases/download/v1.6.0/cosign-linux-amd64
+                            mv cosign-linux-amd64 /usr/local/bin/cosign
+                            chmod +x /usr/local/bin/cosign
+                            cosign sign --key cosign.key -a REPO=$REPOSITORY -a TAG=$VERSION -a SIGNER=GitHub -a DEVELOPER=$DEVELOPER -a TIMESTAMP=$(date --iso-8601="seconds") $IMAGE_ID:$VERSION
+                            """#]
+                    }
+                },
+                // Copy config from hsot to container
                 docker.#Copy & {
                     contents: client.filesystem."./".read.contents
                     include: ["config.json"]
                     dest: "/"
                 },
+                // Run binary ar the end
                 docker.#Set & {
                     config: cmd: ["./app/\(client.env.REPOSITORY)"]
                 },
@@ -103,7 +146,6 @@ dagger.#Plan & {
 
         // Push image to remote registry
         push: {
-
             docker.#Push & {
                 "image": run.output
                 dest:    "\(client.env.DOCKER_USER)/\(client.env.REPOSITORY):\(client.commands.version.stdout)"

@@ -22,11 +22,11 @@ dagger.#Plan & {
             REPOSITORY:         string
             GITHUB_REF:         string
             GITHUB_ACTOR:       string
-            COSIGN_PRIVATE_KEY: dagger.#Secret
-            COSIGN_PASSWORD:    dagger.#Secret
             DOCKER_REPO:        string
             DOCKER_USER:        string
             DOCKER_SECRET:      dagger.#Secret
+            COSIGN_PRIVATE_KEY: dagger.#Secret
+            COSIGN_PASSWORD:    dagger.#Secret
         }
        commands: {
             version: {
@@ -98,6 +98,11 @@ dagger.#Plan & {
                         name: "update-ca-certificates"
                     }
                 },
+                // Copy from build to run
+                docker.#Copy & {
+                    contents: build.output
+                    dest:     "/app"
+                },
                 // Put the private key into /cosign.key
                 docker.#Copy & {
 					contents: _secret.export.directories."/cosign.key"
@@ -107,10 +112,11 @@ dagger.#Plan & {
 					contents: _password.export.directories."/cosign.passwd"
 					dest:     "/"
 				},
-                // Copy from build to run
+                // Copy config to container
                 docker.#Copy & {
-                    contents: build.output
-                    dest:     "/app"
+                    contents: client.filesystem."./".read.contents
+                    include: ["config.json", "dockerconfig.json"]
+                    dest: "/"
                 },
                 // Sign with cosign
                 docker.#Run & {
@@ -118,6 +124,8 @@ dagger.#Plan & {
                     env: VERSION:         client.commands.version.stdout
                     env: REPOSITORY:      client.env.REPOSITORY
                     env: DEVELOPER:       client.env.GITHUB_ACTOR
+                    //env: DOCKER_USER:     client.env.DOCKER_USER
+                    env: DOCKER_SECRET:   client.env.DOCKER_SECRET
                     env: COSIGN_PASSWORD: client.env.COSIGN_PASSWORD
                     command: {
                         name: "sh"
@@ -127,20 +135,18 @@ dagger.#Plan & {
                             wget -q https://github.com/sigstore/cosign/releases/download/v1.6.0/cosign-linux-amd64
                             mv cosign-linux-amd64 /usr/local/bin/cosign
                             chmod +x /usr/local/bin/cosign
-                            cosign sign --key cosign.key -a REPO=$REPOSITORY -a TAG=$VERSION -a SIGNER=GitHub -a DEVELOPER=$DEVELOPER -a TIMESTAMP=$(date --iso-8601="seconds") $IMAGE_ID:$VERSION
+                            mkdir /root/.docker && mv dockerconfig.json /root/.docker/config.json
+                            sed -i 's/_secret_/\(client.env.DOCKER_SECRET)/g' /root/.docker/config.json
+                            cat /root/.docker/config.json
+                            env
+                            cosign sign --key cosign.key -a REPO=$REPOSITORY -a TAG=$VERSION -a SIGNER=GitHub -a DEVELOPER=$DEVELOPER -a TIMESTAMP=$(date +'%Y-%m-%dT%H:%M:%S:%z') $IMAGE_ID:$VERSION
                             """#]
                     }
-                },
-                // Copy config from hsot to container
-                docker.#Copy & {
-                    contents: client.filesystem."./".read.contents
-                    include: ["config.json"]
-                    dest: "/"
                 },
                 // Run binary ar the end
                 docker.#Set & {
                     config: cmd: ["./app/\(client.env.REPOSITORY)"]
-                },
+                }
             ]
         }
 

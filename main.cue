@@ -126,7 +126,7 @@ dagger.#Plan & {
                             """#]
                     }
                 },
-                // Run binary ar the end
+                // Run binary at the end
                 docker.#Set & {
                     config: cmd: ["./app/\(client.env.REPOSITORY)"]
                 }

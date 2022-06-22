@@ -103,11 +103,7 @@ dagger.#Plan & {
                     contents: build.output
                     dest:     "/app"
                 },
-                // Put the private key into /cosign.key
-                docker.#Copy & {
-					contents: _secret.export.directories."/cosign.key"
-					dest:     "/"
-				},
+                // Copy cosign password
                 docker.#Copy & {
 					contents: _password.export.directories."/cosign.passwd"
 					dest:     "/"
@@ -124,7 +120,7 @@ dagger.#Plan & {
                     env: VERSION:         client.commands.version.stdout
                     env: REPOSITORY:      client.env.REPOSITORY
                     env: DEVELOPER:       client.env.GITHUB_ACTOR
-                    //env: DOCKER_USER:     client.env.DOCKER_USER
+                    env: DOCKER_USER:     client.env.DOCKER_USER
                     env: DOCKER_SECRET:   client.env.DOCKER_SECRET
                     env: COSIGN_PASSWORD: client.env.COSIGN_PASSWORD
                     command: {
@@ -132,13 +128,18 @@ dagger.#Plan & {
                         args: ["-c", #"""
                             echo Setting up Cosign
                             export COSIGN_PASSWORD=$(cat /cosign.passwd)
+
                             wget -q https://github.com/sigstore/cosign/releases/download/v1.6.0/cosign-linux-amd64
                             mv cosign-linux-amd64 /usr/local/bin/cosign
                             chmod +x /usr/local/bin/cosign
                             mkdir /root/.docker && mv dockerconfig.json /root/.docker/config.json
-                            sed -i 's/_secret_/\(client.env.DOCKER_SECRET)/g' /root/.docker/config.json
+                            sed -i 's/_auth_/'\"$(echo -n $DOCKER_USER:$DOCKER_SECRET | base64)\"'/g' /root/.docker/config.json
+
+                            echo DEBUG
                             cat /root/.docker/config.json
                             env
+                            
+                            cosign generate-key-pair
                             cosign sign --key cosign.key -a REPO=$REPOSITORY -a TAG=$VERSION -a SIGNER=GitHub -a DEVELOPER=$DEVELOPER -a TIMESTAMP=$(date +'%Y-%m-%dT%H:%M:%S:%z') $IMAGE_ID:$VERSION
                             """#]
                     }

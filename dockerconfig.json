@@ -1,10 +1,7 @@
 {
     "auths": {
-        "docker.io": {
-            "auth": "_secret_"
-        },
         "https://index.docker.io/v1/": {
-            "auth": "_secret_"
+            "auth": _auth_
         }
     }
 }

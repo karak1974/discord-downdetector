@@ -47,25 +47,11 @@ dagger.#Plan & {
             source: client.filesystem."./".read.contents
         }
 
-        // Ugly way to copy the secret and set the password env
+        // Ugly way to set the password env
 		_cosign: alpine.#Build & {
 			packages: {
 				"bash": _
 			}
-		}
-		_secret: docker.#Run & {
-			input: _cosign.output
-			mounts: secret: {
-				dest:     "/run/cosign.key"
-				contents: client.env.COSIGN_PRIVATE_KEY
-			}
-			command: {
-				name: "cp"
-				args: ["/run/cosign.key", "/cosign.key"]
-			}
-			export: directories: {
-                "/cosign.key": _
-            }
 		}
         _password: docker.#Run & {
 			input: _cosign.output
@@ -135,10 +121,6 @@ dagger.#Plan & {
                             mkdir /root/.docker && mv dockerconfig.json /root/.docker/config.json
                             sed -i 's/_auth_/'\"$(echo -n $DOCKER_USER:$DOCKER_SECRET | base64)\"'/g' /root/.docker/config.json
 
-                            echo DEBUG
-                            cat /root/.docker/config.json
-                            env
-                            
                             cosign generate-key-pair
                             cosign sign --key cosign.key -a REPO=$REPOSITORY -a TAG=$VERSION -a SIGNER=GitHub -a DEVELOPER=$DEVELOPER -a TIMESTAMP=$(date +'%Y-%m-%dT%H:%M:%S:%z') $IMAGE_ID:$VERSION
                             """#]

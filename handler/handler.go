@@ -15,8 +15,6 @@ const (
 	warning = 0xD10000
 )
 
-var channelName string
-
 // Check is the endpoint alive
 func Handle(body env.Check) (string, *discordgo.MessageEmbed, error) {
 	var isAlive = true
